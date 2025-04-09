@@ -1,3 +1,4 @@
+import fs from "fs";
 import express from "express";
 import cors from "cors";
 import { execFile } from "child_process";
@@ -8,6 +9,17 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
+// Read proxies from proxies.txt and store them in an array
+const proxies = fs
+  .readFileSync("proxies.txt", "utf8")
+  .split("\n")
+  .map((p) => p.trim())
+  .filter(Boolean);
+
+function getRandomProxy() {
+  return proxies[Math.floor(Math.random() * proxies.length)];
+}
+
 app.post("/download", (req, res) => {
   const { url } = req.body;
 
@@ -16,18 +28,18 @@ app.post("/download", (req, res) => {
     return res.status(400).json({ error: "Missing YouTube URL" });
   }
 
-  console.log(`📥 Request received for URL: ${url}`);
-
-  // Full path if needed; otherwise, "yt-dlp" might work if it's in your PATH.
+  const selectedProxy = getRandomProxy();
   const ytDlpPath = "yt-dlp";
-  // Added --no-check-certificate to bypass SSL verification errors.
   const args = [
+    "--proxy", selectedProxy,   // Use the randomly selected proxy
     "-f", "best[ext=mp4]",
-    "--no-check-certificate",
+    "--no-check-certificate",   // Bypass SSL errors if needed
     "--get-url",
     url
   ];
 
+  console.log(`📥 Request received for URL: ${url}`);
+  console.log(`🌍 Using proxy: ${selectedProxy}`);
   console.log(`⚙️ Running command: ${ytDlpPath} ${args.join(" ")}`);
 
   execFile(ytDlpPath, args, (error, stdout, stderr) => {
@@ -56,7 +68,7 @@ app.post("/download", (req, res) => {
       success: true,
       downloadUrl: directUrl,
       format: "mp4",
-      note: "Successfully extracted URL using yt-dlp with no-check-certificate"
+      proxyUsed: selectedProxy
     });
   });
 });

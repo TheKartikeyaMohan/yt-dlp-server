@@ -9,13 +9,13 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-const proxyList = fs.readFileSync("proxies.txt", "utf8")
+const proxies = fs.readFileSync("proxies.txt", "utf8")
   .split("\n")
   .map(p => p.trim())
   .filter(Boolean);
 
 function getRandomProxy() {
-  return proxyList[Math.floor(Math.random() * proxyList.length)];
+  return proxies[Math.floor(Math.random() * proxies.length)];
 }
 
 app.post("/download", (req, res) => {
@@ -25,32 +25,31 @@ app.post("/download", (req, res) => {
     return res.status(400).json({ error: "Missing YouTube URL" });
   }
 
-  const selectedProxy = getRandomProxy();
+  const proxy = getRandomProxy();
   const ytDlpPath = "yt-dlp";
   const args = [
-    "--proxy", selectedProxy,
+    "--proxy", proxy,
     "-f", "best[ext=mp4]",
     "--get-url",
     url
   ];
 
-  console.log(`📥 Download request for: ${url}`);
-  console.log(`🌐 Using proxy: ${selectedProxy}`);
+  console.log(`📥 Download for: ${url}`);
+  console.log(`🌍 Proxy used: ${proxy}`);
 
-  execFile(ytDlpPath, args, (error, stdout, stderr) => {
-    if (error || !stdout.trim()) {
-      console.error("❌ yt-dlp error:", stderr || error.message);
+  execFile(ytDlpPath, args, (err, stdout, stderr) => {
+    if (err || !stdout.trim()) {
+      console.error("❌ yt-dlp error:", stderr || err.message);
       return res.status(500).json({
         error: "Failed to get video URL",
-        details: stderr || error.message
+        details: stderr || err.message
       });
     }
 
-    const directUrl = stdout.trim();
-    return res.json({
+    res.json({
       success: true,
-      downloadUrl: directUrl,
-      proxyUsed: selectedProxy
+      downloadUrl: stdout.trim(),
+      usedProxy: proxy
     });
   });
 });

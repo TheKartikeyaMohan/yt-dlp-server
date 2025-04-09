@@ -1,4 +1,3 @@
-import fs from "fs";
 import express from "express";
 import cors from "cors";
 import { execFile } from "child_process";
@@ -9,57 +8,45 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Load proxies from proxies.txt (one proxy per line)
-const proxies = fs
-  .readFileSync("proxies.txt", "utf8")
-  .split("\n")
-  .map((p) => p.trim())
-  .filter(Boolean);
+// 🌐 Add a list of proxies (rotate between them)
+const proxyList = [
+  "http://188.68.52.244:80",  // Germany – High uptime
+  "http://137.66.45.239:80",  // US
+  "http://179.61.174.4:80",   // Belgium
+  "http://51.8.245.208:3128", // US
+  "http://152.53.228.157:3128" // Austria
+];
 
+// 🔁 Randomly pick a proxy for each request
 function getRandomProxy() {
-  return proxies[Math.floor(Math.random() * proxies.length)];
+  const index = Math.floor(Math.random() * proxyList.length);
+  return proxyList[index];
 }
 
 app.post("/download", (req, res) => {
   const { url } = req.body;
 
   if (!url) {
-    console.log("❌ No URL provided in request body.");
+    console.log("❌ No URL provided.");
     return res.status(400).json({ error: "Missing YouTube URL" });
   }
 
-  // Select a random proxy from the list
   const selectedProxy = getRandomProxy();
+  console.log(`📥 Request received for URL: ${url}`);
+  console.log(`🌐 Using proxy: ${selectedProxy}`);
 
-  // Use "yt-dlp" from PATH (ensure it's installed and reachable)
-  const ytDlpPath = "yt-dlp";
-
-  // Define a custom User-Agent string that mimics a real browser.
-  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                    "Chrome/115.0.0.0 Safari/537.36";
-
-  // Prepare command arguments with:
-  // - The proxy
-  // - No-check-certificate flag
-  // - The custom user agent
-  // - The video format and extraction method
+  const ytDlpPath = "yt-dlp"; // assumes it's installed globally
   const args = [
     "--proxy", selectedProxy,
     "--no-check-certificate",
-    "--user-agent", userAgent,
     "-f", "best[ext=mp4]",
     "--get-url",
     url
   ];
 
-  console.log(`📥 Request received for URL: ${url}`);
-  console.log(`🌍 Using proxy: ${selectedProxy}`);
-  console.log(`⚙️ Running command: ${ytDlpPath} ${args.join(" ")}`);
-
   execFile(ytDlpPath, args, (error, stdout, stderr) => {
     if (error) {
-      console.error("❌ Error executing yt-dlp:", error.message);
+      console.error("❌ yt-dlp error:", error.message);
       console.error("stderr:", stderr);
       return res.status(500).json({
         error: "Failed to get video URL",
@@ -68,12 +55,11 @@ app.post("/download", (req, res) => {
     }
 
     const directUrl = stdout.trim();
-    console.log("✅ Direct download URL generated:", directUrl);
+    console.log("✅ Direct download URL:", directUrl);
 
     if (!directUrl || !directUrl.startsWith("http")) {
-      console.error("⚠️ Invalid URL returned:", directUrl);
       return res.status(500).json({
-        error: "No valid download URL returned",
+        error: "Invalid or empty URL returned",
         stdout,
         stderr
       });
@@ -83,8 +69,7 @@ app.post("/download", (req, res) => {
       success: true,
       downloadUrl: directUrl,
       format: "mp4",
-      proxyUsed: selectedProxy,
-      note: "Extracted URL using yt-dlp with custom user-agent and proxy rotation"
+      proxyUsed: selectedProxy
     });
   });
 });

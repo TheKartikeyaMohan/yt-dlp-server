@@ -9,11 +9,11 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Read proxies from the proxies.txt file (one proxy per line)
+// Load proxies from proxies.txt (one proxy per line)
 const proxies = fs
   .readFileSync("proxies.txt", "utf8")
   .split("\n")
-  .map(p => p.trim())
+  .map((p) => p.trim())
   .filter(Boolean);
 
 function getRandomProxy() {
@@ -28,13 +28,26 @@ app.post("/download", (req, res) => {
     return res.status(400).json({ error: "Missing YouTube URL" });
   }
 
+  // Select a random proxy from the list
   const selectedProxy = getRandomProxy();
-  const ytDlpPath = "yt-dlp"; // Ensure it's available in PATH or use the full path if necessary.
-  
-  // Add --no-check-certificate to bypass SSL certificate verification errors.
+
+  // Use "yt-dlp" from PATH (ensure it's installed and reachable)
+  const ytDlpPath = "yt-dlp";
+
+  // Define a custom User-Agent string that mimics a real browser.
+  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/115.0.0.0 Safari/537.36";
+
+  // Prepare command arguments with:
+  // - The proxy
+  // - No-check-certificate flag
+  // - The custom user agent
+  // - The video format and extraction method
   const args = [
     "--proxy", selectedProxy,
     "--no-check-certificate",
+    "--user-agent", userAgent,
     "-f", "best[ext=mp4]",
     "--get-url",
     url
@@ -71,7 +84,7 @@ app.post("/download", (req, res) => {
       downloadUrl: directUrl,
       format: "mp4",
       proxyUsed: selectedProxy,
-      note: "Successfully extracted URL using yt-dlp with --no-check-certificate"
+      note: "Extracted URL using yt-dlp with custom user-agent and proxy rotation"
     });
   });
 });

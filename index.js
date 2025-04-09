@@ -9,11 +9,11 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Read proxies from proxies.txt and store them in an array
+// Read proxies from the proxies.txt file (one proxy per line)
 const proxies = fs
   .readFileSync("proxies.txt", "utf8")
   .split("\n")
-  .map((p) => p.trim())
+  .map(p => p.trim())
   .filter(Boolean);
 
 function getRandomProxy() {
@@ -29,11 +29,13 @@ app.post("/download", (req, res) => {
   }
 
   const selectedProxy = getRandomProxy();
-  const ytDlpPath = "yt-dlp";
+  const ytDlpPath = "yt-dlp"; // Ensure it's available in PATH or use the full path if necessary.
+  
+  // Add --no-check-certificate to bypass SSL certificate verification errors.
   const args = [
-    "--proxy", selectedProxy,   // Use the randomly selected proxy
+    "--proxy", selectedProxy,
+    "--no-check-certificate",
     "-f", "best[ext=mp4]",
-    "--no-check-certificate",   // Bypass SSL errors if needed
     "--get-url",
     url
   ];
@@ -68,7 +70,8 @@ app.post("/download", (req, res) => {
       success: true,
       downloadUrl: directUrl,
       format: "mp4",
-      proxyUsed: selectedProxy
+      proxyUsed: selectedProxy,
+      note: "Successfully extracted URL using yt-dlp with --no-check-certificate"
     });
   });
 });
